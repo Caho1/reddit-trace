@@ -35,3 +35,7 @@ Thumbs.db
 # Node (for frontend)
 node_modules/
 .next/
+
+# uv
+uv.lock
+.python-version
