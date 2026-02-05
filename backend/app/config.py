@@ -10,9 +10,9 @@ class Settings(BaseSettings):
     http_proxy: Optional[str] = None
     https_proxy: Optional[str] = None
 
-    # OpenAI
+    # OpenAI (兼容格式)
     openai_api_key: Optional[str] = None
-    openai_base_url: str = "https://api.openai.com/v1"
+    openai_base_url: str = "https://api.apimart.ai/v1"
 
     # Claude
     anthropic_api_key: Optional[str] = None
@@ -22,8 +22,8 @@ class Settings(BaseSettings):
 
     # 默认模型配置
     default_llm_provider: str = "openai"
-    default_screening_model: str = "gpt-3.5-turbo"
-    default_analysis_model: str = "gpt-4"
+    default_screening_model: str = "gemini-2.0-flash"
+    default_analysis_model: str = "gemini-2.5-pro-preview"
 
     class Config:
         env_file = ".env"
