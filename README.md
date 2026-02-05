@@ -159,6 +159,10 @@ JSON URL: https://www.reddit.com/r/SaaS/comments/abc123/title/.json
 
 > $10k MRR 的种子可能就藏在这些"抱怨"里。
 
+## Frontend
+
+See `frontend/README.md`.
+
 ## License
 
 Apache-2.0
