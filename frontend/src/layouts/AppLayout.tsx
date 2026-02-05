@@ -101,7 +101,7 @@ export function AppLayout() {
       </header>
 
       {/* Content */}
-      <main className="pt-24 pb-8 px-6">
+      <main className="pt-32 pb-8 px-6">
         <div className="max-w-7xl mx-auto">
           <Outlet />
         </div>
