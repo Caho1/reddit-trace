@@ -6,17 +6,15 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTime } from '../lib/format'
 import {
+  getDashboardStats,
   listAnalyses,
   listPosts,
-  listSubreddits,
-  listTags,
   type Analysis,
   type Post,
 } from '../services/redditTraceApi'
 
 export function DashboardPage() {
-  const subredditsQuery = useQuery({ queryKey: ['subreddits'], queryFn: listSubreddits })
-  const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: listTags })
+  const statsQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: getDashboardStats })
   const postsQuery = useQuery({
     queryKey: ['posts', { skip: 0, limit: 20 }],
     queryFn: () => listPosts({ skip: 0, limit: 20 }),
@@ -27,10 +25,10 @@ export function DashboardPage() {
   })
 
   const kpis = [
-    { title: '监控板块', value: subredditsQuery.data?.length, loading: subredditsQuery.isLoading },
-    { title: '标签', value: tagsQuery.data?.length, loading: tagsQuery.isLoading },
-    { title: '帖子', value: postsQuery.data?.length, loading: postsQuery.isLoading },
-    { title: '有价值分析', value: valuableAnalysesQuery.data?.length, loading: valuableAnalysesQuery.isLoading },
+    { title: '抓取板块', value: statsQuery.data?.subreddits_fetched, loading: statsQuery.isLoading },
+    { title: '抓取帖子', value: statsQuery.data?.posts_total, loading: statsQuery.isLoading },
+    { title: '标签', value: statsQuery.data?.tags_total, loading: statsQuery.isLoading },
+    { title: '有价值分析', value: statsQuery.data?.analyses_valuable_total, loading: statsQuery.isLoading },
   ]
 
   return (

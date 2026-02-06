@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.models.associations import post_tags
 
 
 class Post(Base):
@@ -23,3 +24,11 @@ class Post(Base):
 
     subreddit = relationship("Subreddit", back_populates="posts")
     comments = relationship("Comment", back_populates="post")
+    tags = relationship(
+        "Tag",
+        secondary=post_tags,
+        back_populates="posts",
+        lazy="selectin",
+        collection_class=set,
+    )
+    payload = relationship("PostPayload", back_populates="post", uselist=False, lazy="selectin")

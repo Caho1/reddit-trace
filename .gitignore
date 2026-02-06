@@ -32,6 +32,14 @@ build/
 .DS_Store
 Thumbs.db
 
+# Local agent/tooling
+.claude/
+nul
+
+# Local agent/tooling
+.claude/
+nul
+
 # Node (for frontend)
 node_modules/
 .next/

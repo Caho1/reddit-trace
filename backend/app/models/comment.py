@@ -22,3 +22,4 @@ class Comment(Base):
     post = relationship("Post", back_populates="comments")
     analyses = relationship("Analysis", back_populates="comment")
     parent = relationship("Comment", remote_side=[id], backref="replies")
+    payload = relationship("CommentPayload", back_populates="comment", uselist=False, lazy="selectin")

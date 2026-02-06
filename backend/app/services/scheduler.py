@@ -2,13 +2,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.models.subreddit import Subreddit
 from app.services.crawler import crawler
 from app.services.analyzer import analyzer
+from app.services.ingest import save_subreddit_posts
 from app.logging_config import get_logger
 
 logger = get_logger("reddit_trace.scheduler")
@@ -45,11 +46,18 @@ class SchedulerService:
                         if self._should_fetch(sub):
                             await self.fetch_subreddit(sub, db)
                 return
-            except DBAPIError as e:
+            except (DBAPIError, ConnectionResetError) as e:
                 logger.error(
                     f"[Scheduler] 数据库连接异常（可能是连接被重置/空闲断开），attempt={attempt + 1}/2: {e}",
                     exc_info=True,
                 )
+                try:
+                    await engine.dispose()
+                except Exception as dispose_err:
+                    logger.warning(
+                        f"[Scheduler] dispose engine 失败: {type(dispose_err).__name__}: {dispose_err}",
+                        exc_info=True,
+                    )
                 await asyncio.sleep(1)
             except Exception as e:
                 logger.error(f"[Scheduler] 未知异常: {type(e).__name__}: {e}", exc_info=True)
@@ -58,15 +66,26 @@ class SchedulerService:
     def _should_fetch(self, sub: Subreddit) -> bool:
         if not sub.last_fetched_at:
             return True
-        elapsed = (datetime.utcnow() - sub.last_fetched_at).total_seconds() / 60
+        last = sub.last_fetched_at
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - last).total_seconds() / 60
         return elapsed >= sub.fetch_interval
 
     async def fetch_subreddit(self, sub: Subreddit, db):
         """抓取版块数据"""
         try:
+            fetched_at = datetime.now(timezone.utc)
             posts = await crawler.fetch_subreddit(sub.name)
-            # TODO: 保存帖子和评论到数据库
-            sub.last_fetched_at = datetime.utcnow()
+            _, created, updated = await save_subreddit_posts(
+                db,
+                subreddit_name=sub.name,
+                posts=posts,
+                fetched_at=fetched_at,
+            )
+            logger.info(
+                f"[Scheduler] r/{sub.name} 抓取完成: posts_created={created}, posts_updated={updated}"
+            )
             await db.commit()
         except Exception as e:
             await db.rollback()

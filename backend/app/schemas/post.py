@@ -1,6 +1,12 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+
+from app.schemas.tag import TagResponse
+
+
+class PostTagsUpdate(BaseModel):
+    tag_ids: List[int] = []
 
 
 class PostResponse(BaseModel):
@@ -17,6 +23,7 @@ class PostResponse(BaseModel):
     num_comments: int
     created_at: datetime
     fetched_at: datetime
+    tags: List[TagResponse] = []
 
     class Config:
         from_attributes = True

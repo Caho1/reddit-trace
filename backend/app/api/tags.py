@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from typing import List
 
 from app.database import get_db
-from app.models.tag import Tag
+from app.models.tag import Tag, AnalysisTag
+from app.models.associations import post_tags
 from app.schemas.tag import TagCreate, TagResponse
 
 router = APIRouter()
@@ -39,6 +40,10 @@ async def delete_tag(tag_id: int, db: AsyncSession = Depends(get_db)):
     tag = result.scalar_one_or_none()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+
+    # 先清理关联关系，避免 FK 冲突
+    await db.execute(delete(AnalysisTag).where(AnalysisTag.tag_id == tag_id))
+    await db.execute(delete(post_tags).where(post_tags.c.tag_id == tag_id))
 
     await db.delete(tag)
     await db.commit()

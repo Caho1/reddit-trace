@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.models.associations import post_tags
 
 
 class Tag(Base):
@@ -10,6 +11,14 @@ class Tag(Base):
     name = Column(String(50), unique=True, index=True)
     color = Column(String(20), default="#1890ff")
     description = Column(Text, nullable=True)
+
+    posts = relationship(
+        "Post",
+        secondary=post_tags,
+        back_populates="tags",
+        lazy="selectin",
+        collection_class=set,
+    )
 
 
 class AnalysisTag(Base):

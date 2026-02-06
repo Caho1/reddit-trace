@@ -6,6 +6,7 @@ from typing import List
 from app.database import get_db
 from app.models.subreddit import Subreddit
 from app.schemas.subreddit import SubredditCreate, SubredditUpdate, SubredditResponse
+from app.services.ingest import normalize_subreddit_name
 
 router = APIRouter()
 
@@ -18,7 +19,24 @@ async def list_subreddits(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=SubredditResponse)
 async def create_subreddit(data: SubredditCreate, db: AsyncSession = Depends(get_db)):
-    subreddit = Subreddit(**data.model_dump())
+    normalized_name = normalize_subreddit_name(data.name)
+
+    result = await db.execute(select(Subreddit).where(Subreddit.name == normalized_name))
+    subreddit = result.scalar_one_or_none()
+
+    if subreddit:
+        payload = data.model_dump(exclude_unset=True)
+        payload.pop("name", None)
+        for key, value in payload.items():
+            setattr(subreddit, key, value)
+
+        await db.commit()
+        await db.refresh(subreddit)
+        return subreddit
+
+    payload = data.model_dump()
+    payload["name"] = normalized_name
+    subreddit = Subreddit(**payload)
     db.add(subreddit)
     await db.commit()
     await db.refresh(subreddit)

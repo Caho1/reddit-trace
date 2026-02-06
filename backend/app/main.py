@@ -7,6 +7,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.api import router
 from app.database import engine, Base
+import app.models  # noqa: F401
 from app.services import scheduler_service
 from app.services.crawler import crawler as reddit_crawler
 from app.logging_config import setup_logging, get_logger

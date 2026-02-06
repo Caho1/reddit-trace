@@ -37,6 +37,7 @@ export type Post = {
   num_comments: number
   created_at: string
   fetched_at: string
+  tags?: Tag[]
 }
 
 export type Analysis = {
@@ -55,6 +56,17 @@ export type Tag = {
   name: string
   color: string
   description?: string | null
+}
+
+export type DashboardStats = {
+  now: string
+  posts_total: number
+  posts_fetched_24h: number
+  subreddits_total: number
+  subreddits_monitored: number
+  subreddits_fetched: number
+  tags_total: number
+  analyses_valuable_total: number
 }
 
 export type CrawlerSubredditPost = {
@@ -130,6 +142,7 @@ export async function deleteSubreddit(subredditId: number): Promise<{ message: s
 
 export async function listPosts(params: {
   subreddit_id?: number
+  tag_id?: number
   skip?: number
   limit?: number
 }): Promise<Post[]> {
@@ -139,6 +152,16 @@ export async function listPosts(params: {
 
 export async function getPost(postId: number): Promise<Post> {
   const { data } = await http.get<Post>(`/posts/${postId}`)
+  return data
+}
+
+export async function listPostTags(postId: number): Promise<Tag[]> {
+  const { data } = await http.get<Tag[]>(`/posts/${postId}/tags`)
+  return data
+}
+
+export async function setPostTags(postId: number, tagIds: number[]): Promise<Tag[]> {
+  const { data } = await http.put<Tag[]>(`/posts/${postId}/tags`, { tag_ids: tagIds })
   return data
 }
 
@@ -153,6 +176,11 @@ export async function listAnalyses(params: {
 
 export async function listTags(): Promise<Tag[]> {
   const { data } = await http.get<Tag[]>('/tags/')
+  return data
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const { data } = await http.get<DashboardStats>('/dashboard/stats')
   return data
 }
 
@@ -186,4 +214,3 @@ export async function crawlerFetchSubreddit(params: {
   )
   return data
 }
-

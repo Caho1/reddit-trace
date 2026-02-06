@@ -6,7 +6,7 @@ Reddit 数据抓取服务
 import asyncio
 import time
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -226,7 +226,7 @@ class RedditCrawler:
             "author": data.get("author"),
             "body": data.get("body"),
             "score": data.get("score", 0),
-            "created_utc": datetime.fromtimestamp(data.get("created_utc", 0)),
+            "created_utc": datetime.fromtimestamp(data.get("created_utc", 0), tz=timezone.utc),
             "permalink": data.get("permalink"),
             "depth": depth,
             "parent_id": data.get("parent_id"),
@@ -301,7 +301,7 @@ class RedditCrawler:
                 "score": post_data.get("score", 0),
                 "upvote_ratio": post_data.get("upvote_ratio", 0),
                 "num_comments": post_data.get("num_comments", 0),
-                "created_utc": datetime.fromtimestamp(post_data.get("created_utc", 0)),
+                "created_utc": datetime.fromtimestamp(post_data.get("created_utc", 0), tz=timezone.utc),
                 "subreddit": post_data.get("subreddit"),
                 "permalink": post_data.get("permalink"),
                 "url": post_data.get("url"),
@@ -341,6 +341,10 @@ class RedditCrawler:
         Returns:
             帖子列表
         """
+        name = (name or "").strip()
+        if name.lower().startswith("r/"):
+            name = name[2:].strip()
+
         logger.info(f"[Subreddit] 开始抓取 r/{name} (sort={sort}, limit={limit})")
 
         # 验证排序方式
@@ -381,7 +385,7 @@ class RedditCrawler:
                     "score": post_data.get("score", 0),
                     "upvote_ratio": post_data.get("upvote_ratio", 0),
                     "num_comments": post_data.get("num_comments", 0),
-                    "created_utc": datetime.fromtimestamp(post_data.get("created_utc", 0)),
+                    "created_utc": datetime.fromtimestamp(post_data.get("created_utc", 0), tz=timezone.utc),
                     "subreddit": post_data.get("subreddit"),
                     "permalink": post_data.get("permalink"),
                     "url": post_data.get("url"),
