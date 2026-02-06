@@ -5,9 +5,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging_config import get_logger
+from app.models.associations import post_tags
 from app.models.comment import Comment
 from app.models.payload import CommentPayload, PostPayload
 from app.models.post import Post
@@ -176,11 +178,25 @@ async def save_subreddit_posts(
                 )
             )
 
+    tag_links: List[Dict[str, int]] = []
+    for post_data in posts:
+        reddit_id = post_data.get("id")
+        if not reddit_id:
+            continue
+        post = existing_posts.get(reddit_id)
+        if not post:
+            continue
+
         flair = post_data.get("link_flair_text")
-        if flair:
-            tag = tag_map.get(str(flair).strip())
-            if tag:
-                post.tags.add(tag)
+        if not flair:
+            continue
+
+        tag = tag_map.get(str(flair).strip())
+        if tag and post.id and tag.id:
+            tag_links.append({"post_id": post.id, "tag_id": tag.id})
+
+    if tag_links:
+        await db.execute(pg_insert(post_tags).values(tag_links).on_conflict_do_nothing())
 
     await db.flush()
     return subreddit, created, updated
