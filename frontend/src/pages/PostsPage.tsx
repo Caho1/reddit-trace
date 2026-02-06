@@ -43,12 +43,12 @@ export function PostsPage() {
         <div className="flex flex-wrap gap-4 items-end">
           <div className="space-y-1">
             <Label>板块</Label>
-            <Select value={subredditId} onValueChange={(v) => { setSubredditId(v); setPage(1) }}>
+            <Select value={subredditId || 'all'} onValueChange={(v) => { setSubredditId(v === 'all' ? '' : v); setPage(1) }}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="全部" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部</SelectItem>
+                <SelectItem value="all">全部</SelectItem>
                 {(subredditsQuery.data ?? []).map((s: Subreddit) => (
                   <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                 ))}
@@ -95,12 +95,14 @@ export function PostsPage() {
             {(postsQuery.data ?? []).map((post) => (
               <TableRow key={post.id}>
                 <TableCell>
-                  <button
-                    className="text-left text-primary hover:underline truncate max-w-[300px] block"
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto max-w-[300px] truncate p-0 text-left"
                     onClick={() => setSelected(post)}
                   >
                     {post.title}
-                  </button>
+                  </Button>
                 </TableCell>
                 <TableCell>{subredditMap.get(post.subreddit_id) || `#${post.subreddit_id}`}</TableCell>
                 <TableCell className="truncate">{post.author}</TableCell>
@@ -108,9 +110,17 @@ export function PostsPage() {
                 <TableCell>{post.num_comments}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{formatDateTime(post.created_at)}</TableCell>
                 <TableCell>
-                  <a href={post.url} target="_blank" rel="noreferrer">
-                    <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                  </a>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground"
+                    asChild
+                  >
+                    <a href={post.url} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="sr-only">打开原帖</span>
+                    </a>
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -131,9 +141,11 @@ export function PostsPage() {
               <div className="text-sm text-muted-foreground">
                 创建：{formatDateTime(selected.created_at)} · 抓取：{formatDateTime(selected.fetched_at)}
               </div>
-              <a href={selected.url} target="_blank" rel="noreferrer" className="text-primary hover:underline text-sm">
-                打开原帖
-              </a>
+              <Button variant="link" className="h-auto p-0 text-sm" asChild>
+                <a href={selected.url} target="_blank" rel="noreferrer">
+                  打开原帖
+                </a>
+              </Button>
 
               <div className="space-y-2">
                 <h4 className="font-medium">内容（原文）</h4>

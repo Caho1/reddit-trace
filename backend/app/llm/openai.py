@@ -11,9 +11,9 @@ from app.llm.base import BaseLLM
 
 
 class OpenAILLM(BaseLLM):
-    """OpenAI LLM 服务实现"""
+    """OpenAI LLM 服务实现（兼容 apimart.ai）"""
 
-    def __init__(self):
+    def __init__(self, model: str = None):
         # 设置代理环境变量
         if settings.http_proxy:
             os.environ["HTTP_PROXY"] = settings.http_proxy
@@ -24,8 +24,10 @@ class OpenAILLM(BaseLLM):
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,
         )
-        self.screening_model = settings.default_screening_model
-        self.analysis_model = settings.default_analysis_model
+        # AnalyzerService 会为不同阶段创建不同实例：一个实例只用一个 model
+        self.model = model or settings.default_analysis_model
+        self.screening_model = self.model
+        self.analysis_model = self.model
 
     async def analyze_comment(self, content: str) -> dict:
         """分析评论内容"""
@@ -83,7 +85,7 @@ class OpenAILLM(BaseLLM):
             return ""
 
         response = await self.client.chat.completions.create(
-            model=self.screening_model,
+            model=self.model,
             messages=[
                 {
                     "role": "system",

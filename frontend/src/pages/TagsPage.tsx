@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -76,7 +78,11 @@ export function TagsPage() {
         </Button>
       </CardHeader>
       <CardContent>
-        {error && <div className="mb-4 p-3 bg-destructive/10 text-destructive text-sm">{error}</div>}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <Table>
           <TableHeader>
@@ -91,12 +97,13 @@ export function TagsPage() {
               <TableRow key={tag.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <span
-                      className="inline-block px-2 py-0.5 text-xs text-white"
+                    <Badge
+                      variant="secondary"
+                      className="text-white"
                       style={{ backgroundColor: tag.color }}
                     >
                       {tag.name}
-                    </span>
+                    </Badge>
                     <span className="text-xs text-muted-foreground">{tag.color}</span>
                   </div>
                 </TableCell>

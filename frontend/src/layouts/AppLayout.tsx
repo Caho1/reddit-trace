@@ -46,15 +46,17 @@ export function AppLayout() {
       <header className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-5xl">
         <div className="flex items-center justify-between gap-4 px-4 py-2.5 rounded-2xl border border-border/50 bg-background/60 backdrop-blur-xl shadow-lg">
           {/* Logo */}
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 cursor-pointer"
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex h-auto items-center gap-2 px-3 py-1.5"
             onClick={() => navigate('/')}
           >
             <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
               RT
             </div>
             <span className="font-semibold hidden sm:block">Reddit Trace</span>
-          </div>
+          </Button>
 
           {/* Divider */}
           <div className="w-px h-6 bg-border/50" />
@@ -62,11 +64,14 @@ export function AppLayout() {
           {/* Navigation */}
           <nav className="flex items-center gap-0.5">
             {NAV_ITEMS.map((item) => (
-              <button
+              <Button
                 key={item.key}
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => navigate(item.key)}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-xl transition-all',
+                  'gap-1.5 px-3 py-1.5 text-sm transition-all',
                   selectedKey === item.key
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -74,7 +79,7 @@ export function AppLayout() {
               >
                 <item.icon className="w-4 h-4" />
                 <span className="hidden lg:inline">{item.label}</span>
-              </button>
+              </Button>
             ))}
           </nav>
 

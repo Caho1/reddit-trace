@@ -42,12 +42,12 @@ export function AnalysesPage() {
         <div className="flex flex-wrap gap-4 items-end">
           <div className="space-y-1">
             <Label>价值筛选</Label>
-            <Select value={isValuable} onValueChange={(v) => { setIsValuable(v); setPage(1) }}>
+            <Select value={isValuable || 'all'} onValueChange={(v) => { setIsValuable(v === 'all' ? '' : v); setPage(1) }}>
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="全部" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部</SelectItem>
+                <SelectItem value="all">全部</SelectItem>
                 <SelectItem value="1">有价值</SelectItem>
                 <SelectItem value="0">未筛选</SelectItem>
                 <SelectItem value="-1">无价值</SelectItem>

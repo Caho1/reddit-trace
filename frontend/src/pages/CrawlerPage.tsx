@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { ExternalLink, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -64,7 +65,11 @@ export function CrawlerPage() {
         <CardTitle>抓取</CardTitle>
       </CardHeader>
       <CardContent>
-        {error && <div className="mb-4 p-3 bg-destructive/10 text-destructive text-sm">{error}</div>}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <Tabs defaultValue="subreddit">
           <TabsList>
@@ -154,9 +159,17 @@ export function CrawlerPage() {
                     <TableCell>{post.num_comments}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatDateTime(post.created_utc)}</TableCell>
                     <TableCell>
-                      <a href={post.url} target="_blank" rel="noreferrer">
-                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                      </a>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        asChild
+                      >
+                        <a href={post.url} target="_blank" rel="noreferrer">
+                          <ExternalLink className="h-4 w-4" />
+                          <span className="sr-only">打开原帖</span>
+                        </a>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     http_proxy: Optional[str] = None
     https_proxy: Optional[str] = None
 
+    # Reddit OAuth（可选，推荐）
+    # 创建应用：https://www.reddit.com/prefs/apps
+    reddit_client_id: Optional[str] = None
+    reddit_client_secret: Optional[str] = None
+    reddit_user_agent: str = "reddit-trace/0.1"
+
     # OpenAI (兼容格式)
     openai_api_key: Optional[str] = None
     openai_base_url: str = "https://api.apimart.ai/v1"

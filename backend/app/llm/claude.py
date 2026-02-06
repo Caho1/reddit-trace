@@ -13,7 +13,7 @@ from app.llm.base import BaseLLM
 class ClaudeLLM(BaseLLM):
     """Claude LLM 服务实现"""
 
-    def __init__(self):
+    def __init__(self, model: str = None):
         # 设置代理环境变量
         if settings.http_proxy:
             os.environ["HTTP_PROXY"] = settings.http_proxy
@@ -23,7 +23,7 @@ class ClaudeLLM(BaseLLM):
         self.client = AsyncAnthropic(
             api_key=settings.anthropic_api_key,
         )
-        self.model = "claude-3-sonnet-20240229"
+        self.model = model or "claude-3-sonnet-20240229"
 
     async def analyze_comment(self, content: str) -> dict:
         """分析评论内容"""
