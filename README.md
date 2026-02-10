@@ -1,212 +1,198 @@
 # Trace Hub
 
-基于多平台社区数据的用户需求挖掘系统（当前支持 Reddit + Hacker News）。
+多平台社区热点与用户需求挖掘系统（当前支持 `Reddit` + `Hacker News`）。
 
-通过自动抓取社区真实对话，利用 AI 智能分析提取用户痛点、需求和创业机会。
+通过统一抓取、统一入库、统一查询和 AI 分析，持续沉淀可检索的用户痛点、需求与机会信号。
 
-## 核心价值
+## 当前能力
 
-- **真实性**: 获取用户在社区的真实讨论，而非调研问卷
-- **深度**: 完整的对话线程和嵌套评论分析
-- **规模化**: 定时自动监控，建立需求数据库
-- **智能化**: AI 两阶段分析，精准提取有价值信息
+- 多源抓取：`Reddit`、`Hacker News`
+- 统一目标模型：`source + target_type + target_key`
+- 统一内容模型：`source_items / source_comments`
+- 标签体系：支持筛选与人工归类
+- 定时调度：基于目标的自动抓取
+- AI 分析：价值筛选 + 深度分析（可扩展 provider）
 
-## 功能特性
+## 架构说明（多源可扩展）
 
-### 数据采集
-- 多平台统一抓取（Reddit / Hacker News）
-- 统一目标管理（source + target_type + target_key）
-- 定时自动监控目标
-- 平台适配器可扩展
+### 核心表（推荐使用）
 
-### AI 分析
-- 多模型支持（OpenAI / Claude / Ollama）
-- 两阶段分析：批量筛选 + 深度分析
-- 提取维度：用户痛点、用户需求、创业机会
-- 双语存储：英文原文 + 中文翻译
+- `source_targets`：监控目标
+- `source_items`：统一内容实体（帖子/故事）
+- `source_comments`：统一评论实体
+- `source_item_payloads` / `source_comment_payloads`：原始 payload
+- `source_item_tags`：统一内容与标签关联
 
-### 数据管理
-- 标签/分类系统
-- 数据导出（Excel/CSV/JSON）
-- Markdown 报告生成
+### 兼容表（逐步迁移）
 
-## 技术栈
+- `subreddits / posts / comments` 及其关联表仍保留，用于兼容旧接口。
 
-| 层级 | 技术 |
-|------|------|
-| 后端框架 | FastAPI |
-| 数据库 | PostgreSQL |
-| ORM | SQLAlchemy 2.0 (async) |
-| 定时任务 | APScheduler |
-| AI 集成 | OpenAI / Anthropic SDK |
-| HTTP 客户端 | httpx (async) |
+### 适配器模式
+
+- 每个平台实现 `SourceAdapter`
+- 注册中心统一管理平台能力
+- 新增平台时，优先复用统一抓取/入库/调度链路
+
+## 环境要求
+
+- Python `3.12+`
+- Node.js `18+`
+- PostgreSQL `14+`
+- `uv`（推荐用于 Python 依赖管理与运行）
 
 ## 快速开始
 
-### 环境要求
+### 1) 克隆仓库
 
-- Python 3.10+
-- PostgreSQL 14+
-
-### 安装步骤
-
-1. **克隆仓库**
 ```bash
 git clone https://github.com/Caho1/reddit-trace.git
 cd reddit-trace
 ```
 
-2. **创建虚拟环境**
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
-```
+### 2) 后端初始化
 
-3. **安装依赖**
 ```bash
 cd backend
-pip install -r requirements.txt
+uv sync
+copy .env.example .env   # Windows
+# cp .env.example .env   # Linux/Mac
 ```
 
-4. **配置环境变量**
-```bash
-cp .env.example .env
-```
+编辑 `backend/.env`，至少配置：
 
-编辑 `.env` 文件：
 ```env
-# 数据库
-DATABASE_URL=postgresql://user:password@localhost:5432/reddit_trace
-# 是否在应用启动时自动 create_all（建议生产环境关闭）
+DATABASE_URL=postgresql+asyncpg://user:password@host:5432/dbname
 AUTO_CREATE_TABLES=false
 
-# 代理（访问 Reddit 需要）
+# 如果访问 Reddit 需要代理
 HTTP_PROXY=http://127.0.0.1:7890
 HTTPS_PROXY=http://127.0.0.1:7890
-
-# AI 模型 API Key（至少配置一个）
-OPENAI_API_KEY=sk-xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
 ```
 
-5. **创建数据库**
-```bash
-createdb reddit_trace
-```
+执行迁移：
 
-6. **执行数据库迁移（推荐）**
 ```bash
-cd backend
 uv run alembic upgrade head
 ```
 
-7. **启动服务**
+启动后端：
+
 ```bash
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
-访问 http://localhost:8000/docs 查看 API 文档。
+后端文档：`http://localhost:8000/docs`
 
-### 迁移常用命令
+### 3) 前端初始化
 
 ```bash
-# 生成新迁移
-cd backend
-uv run alembic revision -m "your_migration_name"
-
-# 查看当前版本
-uv run alembic current
-
-# 升级到最新
-uv run alembic upgrade head
-
-# 回滚一步
-uv run alembic downgrade -1
+cd ../frontend
+npm install
+npm run dev
 ```
 
-## API 示例
+前端地址：`http://localhost:5173`
 
-### 抓取单个帖子（兼容接口）
+## 关键 API（推荐走统一接口）
+
+### 查看平台能力
+
 ```bash
-curl -X POST http://localhost:8000/api/crawler/fetch-post \
+curl http://localhost:8000/api/sources/capabilities
+```
+
+### 创建监控目标
+
+```bash
+curl -X POST http://localhost:8000/api/sources/targets \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.reddit.com/r/SaaS/comments/xxx/title"}'
+  -d '{
+    "source": "hackernews",
+    "target_type": "feed",
+    "target_key": "topstories",
+    "display_name": "HN Top Stories",
+    "monitor_enabled": true,
+    "fetch_interval": 60
+  }'
 ```
 
-### 抓取版块帖子
-```bash
-curl -X POST http://localhost:8000/api/crawler/fetch-subreddit \
-  -H "Content-Type: application/json" \
-  -d '{"name": "SaaS", "sort": "hot", "limit": 25}'
-```
+### 触发抓取
 
-### 添加监控版块
-```bash
-curl -X POST http://localhost:8000/api/subreddits \
-  -H "Content-Type: application/json" \
-  -d '{"name": "SaaS", "monitor_enabled": true, "fetch_interval": 60}'
-```
-
-### 统一目标抓取（推荐）
 ```bash
 curl -X POST http://localhost:8000/api/sources/fetch \
   -H "Content-Type: application/json" \
-  -d '{"source": "hackernews", "target_type": "feed", "target_key": "topstories", "limit": 30}'
+  -d '{
+    "source": "hackernews",
+    "target_type": "feed",
+    "target_key": "topstories",
+    "limit": 30,
+    "include_comments": false
+  }'
 ```
 
-### 查询统一内容（推荐）
+### 查询内容（兼容返回结构）
+
 ```bash
 curl "http://localhost:8000/api/posts?source=hackernews&limit=20"
 ```
 
+> `POSTS` 接口已支持 `"/api/posts"` 与 `"/api/posts/"`，推荐使用无尾斜杠路径。
+
+## 兼容接口（保留）
+
+- `POST /api/crawler/fetch-post`
+- `POST /api/crawler/fetch-subreddit`
+- `GET/PUT /api/posts/*`
+- `GET/POST/PATCH/DELETE /api/subreddits/*`
+
+这些接口仍可用，但新功能建议优先接入 `sources/*`。
+
+## 新平台接入指南
+
+1. 在 `backend/app/services/sources/` 新增适配器文件（实现 `SourceAdapter`）。
+2. 在 `source_registry_service` 注册该适配器。
+3. 前端补充目标类型与抓取表单（`CrawlerPage` / `SubredditsPage`）。
+4. 复用统一抓取、统一入库、统一查询链路，无需再建一套独立表结构。
+
+## 常用开发命令
+
+### 后端
+
+```bash
+cd backend
+uv run alembic current
+uv run alembic revision -m "your_migration"
+uv run alembic upgrade head
+uv run python -m compileall app
+```
+
+### 前端
+
+```bash
+cd frontend
+npm run typecheck
+npm run build
+```
+
 ## 项目结构
 
-```
+```text
 reddit-trace/
 ├── backend/
+│   ├── alembic/
 │   ├── app/
-│   │   ├── api/          # API 路由
-│   │   ├── models/       # 数据模型
-│   │   ├── schemas/      # Pydantic schemas
-│   │   ├── services/     # 业务逻辑
-│   │   ├── llm/          # LLM 集成
-│   │   ├── main.py       # 入口文件
-│   │   ├── config.py     # 配置管理
-│   │   └── database.py   # 数据库连接
-│   ├── requirements.txt
+│   │   ├── api/
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   │   └── sources/      # 平台适配器
+│   │   ├── llm/
+│   │   └── main.py
+│   ├── pyproject.toml
 │   └── .env.example
-├── PLAN.md               # 详细设计文档
+├── frontend/
 └── README.md
 ```
-
-## 多平台架构要点
-
-- `source_targets`: 统一监控目标
-- `source_items/source_comments`: 统一内容与评论实体
-- `SourceAdapter`: 平台适配器抽象
-- `source_registry`: 适配器注册中心
-- `sources/* API`: 统一平台能力入口
-
-## Reddit JSON Hack 方法论（保留）
-
-**核心逻辑**: 在任意 Reddit 帖子 URL 后加 `/.json`，即可获取完整的 JSON 数据。
-
-```
-原始 URL: https://www.reddit.com/r/SaaS/comments/abc123/title
-JSON URL: https://www.reddit.com/r/SaaS/comments/abc123/title/.json
-```
-
-**分析重点**:
-- 用户抱怨什么 → 痛点
-- 用户希望什么 → 需求
-- 用户的变通方案 → 市场机会
-
-> $10k MRR 的种子可能就藏在这些"抱怨"里。
-
-## Frontend
-
-See `frontend/README.md`.
 
 ## License
 
