@@ -18,8 +18,8 @@ import { useTheme } from '../state/theme'
 const NAV_ITEMS = [
   { key: '/', icon: LayoutDashboard, label: '仪表盘' },
   { key: '/crawler', icon: Download, label: '抓取' },
-  { key: '/subreddits', icon: Grid3X3, label: '板块监控' },
-  { key: '/posts', icon: FileText, label: '帖子' },
+  { key: '/subreddits', icon: Grid3X3, label: '监控目标' },
+  { key: '/posts', icon: FileText, label: '内容' },
   { key: '/analyses', icon: Lightbulb, label: '分析结果' },
   { key: '/tags', icon: Tags, label: '标签' },
 ]
@@ -55,7 +55,7 @@ export function AppLayout() {
             <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
               RT
             </div>
-            <span className="font-semibold hidden sm:block">Reddit Trace</span>
+            <span className="font-semibold hidden sm:block">Trace Hub</span>
           </Button>
 
           {/* Divider */}

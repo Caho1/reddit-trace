@@ -1,7 +1,8 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
-from app.models.associations import post_tags
+from app.models.post_tag_associations import post_tags
+from app.models.source_item_tag_associations import source_item_tags
 
 
 class Tag(Base):
@@ -15,6 +16,13 @@ class Tag(Base):
     posts = relationship(
         "Post",
         secondary=post_tags,
+        back_populates="tags",
+        lazy="selectin",
+        collection_class=set,
+    )
+    source_items = relationship(
+        "SourceItem",
+        secondary=source_item_tags,
         back_populates="tags",
         lazy="selectin",
         collection_class=set,

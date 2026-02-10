@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,17 +8,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatDateTime } from '../lib/format'
-import { listAnalyses, type Analysis } from '../services/redditTraceApi'
+import { listAnalyses, type Analysis } from '../services/traceHubApi'
 
 export function AnalysesPage() {
+  const [source, setSource] = useState<string>('')
   const [isValuable, setIsValuable] = useState<string>('')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Analysis | null>(null)
 
   const analysesQuery = useQuery({
-    queryKey: ['analyses', { isValuable, page, pageSize }],
+    queryKey: ['analyses', { source, isValuable, page, pageSize }],
     queryFn: () => listAnalyses({
+      source: source || undefined,
       is_valuable: isValuable ? parseInt(isValuable) : undefined,
       skip: (page - 1) * pageSize,
       limit: pageSize,
@@ -40,6 +42,26 @@ export function AnalysesPage() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 items-end">
+          <div className="space-y-1">
+            <Label>来源</Label>
+            <Select
+              value={source || 'all'}
+              onValueChange={(v) => {
+                setSource(v === 'all' ? '' : v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="reddit">Reddit</SelectItem>
+                <SelectItem value="hackernews">Hacker News</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1">
             <Label>价值筛选</Label>
             <Select value={isValuable || 'all'} onValueChange={(v) => { setIsValuable(v === 'all' ? '' : v); setPage(1) }}>
@@ -82,6 +104,7 @@ export function AnalysesPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">ID</TableHead>
+              <TableHead className="w-24">来源</TableHead>
               <TableHead className="w-24">评论ID</TableHead>
               <TableHead className="w-20">价值</TableHead>
               <TableHead className="w-36">模型</TableHead>
@@ -94,6 +117,7 @@ export function AnalysesPage() {
             {(analysesQuery.data ?? []).map((a) => (
               <TableRow key={a.id}>
                 <TableCell>{a.id}</TableCell>
+                <TableCell>{a.source || '-'}</TableCell>
                 <TableCell>{a.comment_id}</TableCell>
                 <TableCell>{getValueBadge(a.is_valuable)}</TableCell>
                 <TableCell className="truncate text-xs">{a.model_used}</TableCell>
@@ -120,7 +144,7 @@ export function AnalysesPage() {
           {selected && (
             <div className="mt-4 space-y-4">
               <div className="text-sm text-muted-foreground">
-                评论ID：{selected.comment_id} · 模型：{selected.model_used}
+                来源：{selected.source || '-'} · 评论ID：{selected.comment_id} · 模型：{selected.model_used}
               </div>
               <div className="text-sm text-muted-foreground">
                 时间：{formatDateTime(selected.created_at)}

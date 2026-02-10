@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+﻿import { useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -11,7 +11,7 @@ import {
   listPosts,
   type Analysis,
   type Post,
-} from '../services/redditTraceApi'
+} from '../services/traceHubApi'
 
 export function DashboardPage() {
   const statsQuery = useQuery({ queryKey: ['dashboard-stats'], queryFn: getDashboardStats })
@@ -25,10 +25,16 @@ export function DashboardPage() {
   })
 
   const kpis = [
-    { title: '抓取板块', value: statsQuery.data?.subreddits_fetched, loading: statsQuery.isLoading },
-    { title: '抓取帖子', value: statsQuery.data?.posts_total, loading: statsQuery.isLoading },
+    { title: '监控目标', value: statsQuery.data?.targets_fetched, loading: statsQuery.isLoading },
+    { title: '抓取内容', value: statsQuery.data?.source_items_total, loading: statsQuery.isLoading },
     { title: '标签', value: statsQuery.data?.tags_total, loading: statsQuery.isLoading },
-    { title: '有价值分析', value: statsQuery.data?.analyses_valuable_total, loading: statsQuery.isLoading },
+    {
+      title: '有价值分析',
+      value:
+        (statsQuery.data?.source_analyses_valuable_total || 0) +
+        (statsQuery.data?.analyses_valuable_total || 0),
+      loading: statsQuery.isLoading,
+    },
   ]
 
   return (
@@ -37,7 +43,7 @@ export function DashboardPage() {
         <Info className="h-4 w-4" />
         <AlertTitle>快速开始</AlertTitle>
         <AlertDescription>
-          先去 <strong>抓取</strong> 页面获取 Reddit 数据；如果你要长期监控，去"板块监控"开启定时抓取。
+          先去 <strong>抓取</strong> 页面获取 Reddit / Hacker News 数据；如果你要长期监控，去"监控目标"开启定时抓取。
         </AlertDescription>
       </Alert>
 
@@ -62,6 +68,7 @@ export function DashboardPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-24">来源</TableHead>
                   <TableHead>标题</TableHead>
                   <TableHead className="w-20">评分</TableHead>
                   <TableHead className="w-32">时间</TableHead>
@@ -69,7 +76,10 @@ export function DashboardPage() {
               </TableHeader>
               <TableBody>
                 {(postsQuery.data ?? []).slice(0, 10).map((post: Post) => (
-                  <TableRow key={post.id}>
+                  <TableRow key={`${post.source}-${post.id}`}>
+                    <TableCell>
+                      <Badge variant="outline">{post.source}</Badge>
+                    </TableCell>
                     <TableCell className="truncate max-w-[200px]">
                       <a href={post.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                         {post.title}
@@ -94,6 +104,7 @@ export function DashboardPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">ID</TableHead>
+                  <TableHead className="w-24">来源</TableHead>
                   <TableHead className="w-20">价值</TableHead>
                   <TableHead>痛点/需求/机会</TableHead>
                   <TableHead className="w-32">时间</TableHead>
@@ -103,6 +114,9 @@ export function DashboardPage() {
                 {(valuableAnalysesQuery.data ?? []).slice(0, 10).map((a: Analysis) => (
                   <TableRow key={a.id}>
                     <TableCell>{a.id}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{a.source || '-'}</Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="success">有价值</Badge>
                     </TableCell>

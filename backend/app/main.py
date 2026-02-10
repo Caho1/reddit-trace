@@ -9,8 +9,10 @@ from app.api import router
 from app.database import engine, Base
 import app.models  # noqa: F401
 from app.services import scheduler_service
-from app.services.crawler import crawler as reddit_crawler
+from app.services.reddit_crawler_service import crawler as reddit_crawler
+from app.services.source_registry_service import source_registry
 from app.logging_config import setup_logging, get_logger
+from app.config import settings
 
 # 初始化日志系统
 setup_logging(level="INFO")
@@ -22,11 +24,14 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     logger.info("Reddit Trace 服务启动中...")
 
-    # 启动时创建表（开发环境用，生产环境用 alembic）
+    # 启动时按配置创建表（推荐关闭，使用 Alembic 迁移）
     logger.info("[1/2] 初始化数据库...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("[1/2] 数据库初始化完成")
+    if settings.auto_create_tables:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("[1/2] 已执行 Base.metadata.create_all")
+    else:
+        logger.info("[1/2] 跳过 create_all（使用 Alembic 管理表结构）")
 
     # 启动定时任务调度器
     logger.info("[2/2] 启动定时任务调度器...")
@@ -44,6 +49,10 @@ async def lifespan(app: FastAPI):
         await reddit_crawler.close()
     except Exception as e:
         logger.warning(f"关闭 HTTP 客户端失败: {type(e).__name__}: {e}", exc_info=True)
+    try:
+        await source_registry.close_all()
+    except Exception as e:
+        logger.warning(f"关闭 Source 适配器失败: {type(e).__name__}: {e}", exc_info=True)
     logger.info("服务已关闭")
 
 

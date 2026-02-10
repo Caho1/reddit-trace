@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,10 +7,13 @@ import httpx
 
 from app.database import get_db
 from app.services import crawler
-from app.services.ingest import save_post_comments, save_subreddit_posts
-from app.models.post import Post
+from app.services.reddit_ingestion_service import save_post_comments, save_subreddit_posts
+from app.models.posts import Post
 from sqlalchemy import select
 from app.logging_config import get_logger
+from app.services.source_fetch_service import fetch_and_ingest_target
+from app.services.source_ingestion_service import upsert_source_target
+from app.services.source_registry_service import source_registry
 
 logger = get_logger("reddit_trace.api.crawler")
 
@@ -18,10 +21,14 @@ router = APIRouter()
 
 
 class FetchRequest(BaseModel):
+    """按 URL 抓取单条内容的请求体。"""
+
     url: str
 
 
 class FetchSubredditRequest(BaseModel):
+    """抓取 subreddit 列表的请求体。"""
+
     name: str
     sort: str = "hot"
     limit: int = 25
@@ -29,7 +36,15 @@ class FetchSubredditRequest(BaseModel):
 
 @router.post("/fetch-post")
 async def fetch_post(req: FetchRequest, db: AsyncSession = Depends(get_db)):
-    """抓取单个帖子及其评论"""
+    """抓取单贴及评论，并写入旧表和统一表。
+
+    参数：
+        req: 含帖子 URL 的请求体。
+        db: 异步数据库会话。
+
+    返回：
+        dict: 抓取结果与入库统计。
+    """
     logger.info(f"[API] 收到抓取帖子请求: {req.url}")
     try:
         result = await crawler.fetch_post(req.url)
@@ -60,6 +75,22 @@ async def fetch_post(req: FetchRequest, db: AsyncSession = Depends(get_db)):
             )
 
         await db.commit()
+
+        # 写入统一模型（source_items/source_comments）
+        try:
+            await fetch_and_ingest_target(
+                db,
+                source="reddit",
+                target_type="post_url",
+                target_key=req.url,
+                limit=1,
+                include_comments=True,
+                comment_limit=max(20, len(comments_data) or 20),
+                options={},
+            )
+        except Exception as ingest_err:
+            logger.warning(f"[API] 统一模型写入失败(不影响旧返回): {ingest_err}")
+
         logger.info(f"[API] 帖子抓取成功")
         return {
             **result,
@@ -113,9 +144,70 @@ async def fetch_post(req: FetchRequest, db: AsyncSession = Depends(get_db)):
         )
 
 
+@router.post("/fetch-item")
+async def fetch_item(req: FetchRequest, db: AsyncSession = Depends(get_db)):
+    """统一抓取入口：按 URL 自动识别平台并写入统一表。
+
+    参数：
+        req: 目标 URL 请求体。
+        db: 异步数据库会话。
+
+    返回：
+        dict: 平台信息、抓取结果与入库统计。
+    """
+    url = (req.url or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url is required")
+
+    source = "reddit"
+    target_type = "post_url"
+    if "news.ycombinator.com/item?id=" in url:
+        source = "hackernews"
+        target_type = "story"
+        try:
+            story_id = url.split("item?id=")[1].split("&")[0]
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid Hacker News story URL")
+        target_key = story_id
+    else:
+        target_key = url
+
+    try:
+        source_registry.get(source)
+        result = await fetch_and_ingest_target(
+            db,
+            source=source,
+            target_type=target_type,
+            target_key=target_key,
+            limit=1,
+            include_comments=True,
+            comment_limit=100,
+            options={},
+        )
+        return {
+            "source": source,
+            "items": result["items"],
+            "saved": result["saved"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"[API] 统一抓取失败: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/fetch-subreddit")
 async def fetch_subreddit(req: FetchSubredditRequest, db: AsyncSession = Depends(get_db)):
-    """抓取版块帖子列表"""
+    """抓取 subreddit feed，并写入旧表和统一表。
+
+    参数：
+        req: subreddit 抓取请求。
+        db: 异步数据库会话。
+
+    返回：
+        dict: 帖子列表与入库统计。
+    """
     logger.info(f"[API] 收到抓取版块请求: r/{req.name} (sort={req.sort}, limit={req.limit})")
     try:
         posts = await crawler.fetch_subreddit(req.name, req.sort, req.limit)
@@ -127,6 +219,35 @@ async def fetch_subreddit(req: FetchSubredditRequest, db: AsyncSession = Depends
             fetched_at=fetched_at,
         )
         await db.commit()
+
+        # 同步创建/更新统一 target 并写入统一模型
+        target = await upsert_source_target(
+            db,
+            source="reddit",
+            target_type="subreddit",
+            target_key=req.name,
+            display_name=req.name,
+            monitor_enabled=False,
+            fetch_interval=60,
+            options={"sort": req.sort, "limit": req.limit},
+            fetched_at=fetched_at,
+        )
+        await db.commit()
+
+        try:
+            await fetch_and_ingest_target(
+                db,
+                source="reddit",
+                target_type="subreddit",
+                target_key=target.target_key,
+                limit=req.limit,
+                include_comments=False,
+                comment_limit=20,
+                options={"sort": req.sort, "limit": req.limit},
+            )
+        except Exception as ingest_err:
+            logger.warning(f"[API] 统一模型写入失败(不影响旧返回): {ingest_err}")
+
         logger.info(f"[API] 版块抓取成功，共 {len(posts)} 个帖子")
         return {
             "posts": posts,

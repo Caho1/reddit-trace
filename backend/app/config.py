@@ -5,6 +5,7 @@ from typing import Optional
 class Settings(BaseSettings):
     # 数据库
     database_url: str = "postgresql://user:password@localhost:5432/reddit_trace"
+    auto_create_tables: bool = False
 
     # 代理配置
     http_proxy: Optional[str] = None

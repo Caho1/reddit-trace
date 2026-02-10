@@ -1,4 +1,4 @@
-"""
+﻿"""
 Reddit 数据抓取服务
 使用 Reddit JSON API 抓取帖子和评论数据
 """
@@ -15,34 +15,44 @@ from app.logging_config import get_logger
 
 logger = get_logger("reddit_trace.crawler")
 
+# 该文件保留少量关键行内注释，用于说明 Reddit 返回结构与分支处理意图。
+
 
 class RedditCrawler:
-    """Reddit 数据抓取器"""
+    """Reddit 抓取器（支持 JSON 与 OAuth 两种链路）。
+
+    该类封装了限流、OAuth Token 管理、请求重试与帖子/评论解析逻辑。
+    """
 
     BASE_URL = "https://www.reddit.com"
     OAUTH_BASE_URL = "https://oauth.reddit.com"
     TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
-    # 使用更完整的 User-Agent，模拟真实浏览器
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-    # Rate limit 配置
     REQUEST_DELAY = 2.0  # 请求间隔（秒）
     MAX_RETRIES = 2
 
     def __init__(self):
+        """初始化抓取器运行状态与内存缓存。"""
         self._last_request_time: Optional[float] = None
         self._client: Optional[httpx.AsyncClient] = None
         self._oauth_access_token: Optional[str] = None
         self._oauth_expires_at: Optional[float] = None
 
     def _oauth_enabled(self) -> bool:
+        """检查是否配置了 Reddit OAuth 凭证。"""
         return bool(settings.reddit_client_id and settings.reddit_client_secret)
 
     def _get_user_agent(self) -> str:
+        """返回 User-Agent，优先使用配置值。"""
         return settings.reddit_user_agent or self.USER_AGENT
 
     def _get_proxy_config(self) -> Optional[Dict[str, str]]:
-        """获取代理配置"""
+        """根据配置构建代理映射。
+
+        返回：
+            Optional[Dict[str, str]]: ``http://`` / ``https://`` 代理映射。
+        """
         proxies = {}
         if settings.http_proxy:
             proxies["http://"] = settings.http_proxy
@@ -58,7 +68,11 @@ class RedditCrawler:
         return proxies if proxies else None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """获取或创建 HTTP 客户端"""
+        """获取或创建共享 HTTP 客户端。
+
+        返回：
+            httpx.AsyncClient: 可复用异步客户端。
+        """
         if self._client is None or self._client.is_closed:
             logger.debug("创建新的 HTTP 客户端...")
             proxy_config = self._get_proxy_config()
@@ -72,7 +86,11 @@ class RedditCrawler:
         return self._client
 
     async def _get_oauth_token(self) -> Optional[str]:
-        """获取 OAuth access_token（Application-only OAuth）"""
+        """获取 Reddit OAuth 访问令牌（客户端模式）。
+
+        返回：
+            Optional[str]: OAuth 开启时返回访问令牌。
+        """
         if not self._oauth_enabled():
             return None
 
@@ -95,13 +113,20 @@ class RedditCrawler:
         if not token:
             raise ValueError("Reddit OAuth 响应缺少 access_token")
 
-        # 预留 60 秒缓冲，避免临界过期
         self._oauth_access_token = token
         self._oauth_expires_at = now + max(0, expires_in - 60)
         logger.info("[OAuth] access_token 获取成功")
         return token
 
     async def _get_request_headers(self, *, oauth: bool) -> Dict[str, str]:
+        """构建请求头。
+
+        参数：
+            oauth: 是否附带 OAuth bearer token。
+
+        返回：
+            Dict[str, str]: 当前请求所需附加头。
+        """
         if not oauth:
             return {}
 
@@ -111,7 +136,7 @@ class RedditCrawler:
         return {"Authorization": f"bearer {token}"}
 
     async def _rate_limit(self):
-        """遵守 rate limit，添加请求延迟"""
+        """执行最小请求间隔限流。"""
         if self._last_request_time is not None:
             elapsed = asyncio.get_event_loop().time() - self._last_request_time
             if elapsed < self.REQUEST_DELAY:
@@ -119,7 +144,15 @@ class RedditCrawler:
         self._last_request_time = asyncio.get_event_loop().time()
 
     async def _fetch_json(self, url: str, *, oauth: bool = False) -> Dict[str, Any]:
-        """发送请求并获取 JSON 数据"""
+        """抓取 JSON 数据并执行重试与异常处理。
+
+        参数：
+            url: 请求地址。
+            oauth: 是否走 OAuth 域名链路。
+
+        返回：
+            Dict[str, Any]: 解析后的 JSON 对象。
+        """
         await self._rate_limit()
 
         # 未认证模式：尽量使用 .json 端点；认证模式：走 oauth.reddit.com（无需 .json）
@@ -180,7 +213,14 @@ class RedditCrawler:
         raise RuntimeError("unreachable")
 
     def _to_oauth_url(self, url: str) -> Optional[str]:
-        """将常见 Reddit URL 转换为 oauth.reddit.com 请求 URL"""
+        """将普通 Reddit URL 转换为 OAuth URL。
+
+        参数：
+            url: 原始 Reddit URL。
+
+        返回：
+            Optional[str]: 转换成功返回 OAuth URL，否则返回 ``None``。
+        """
         if not self._oauth_enabled():
             return None
 
@@ -218,6 +258,15 @@ class RedditCrawler:
         return None
 
     def _parse_comment(self, comment_data: Dict[str, Any], depth: int = 0) -> Dict[str, Any]:
+        """将单条原始评论节点转换为统一结构。
+
+        参数：
+            comment_data: Reddit 原始评论 JSON。
+            depth: 当前评论深度。
+
+        返回：
+            Dict[str, Any]: 规范化评论字典。
+        """
         """解析单个评论数据"""
         data = comment_data.get("data", {})
 
@@ -261,14 +310,13 @@ class RedditCrawler:
         return comments
 
     async def fetch_post(self, url: str) -> dict:
-        """
-        抓取单个帖子及其评论
+        """抓取单个帖子及完整评论树。
 
-        Args:
-            url: Reddit 帖子 URL
+        参数：
+            url: Reddit 帖子 URL。
 
-        Returns:
-            包含帖子信息和评论列表的字典
+        返回：
+            dict: 包含 ``post`` 与 ``comments`` 的结果字典。
         """
         logger.info(f"[Post] 开始抓取帖子: {url}")
 
@@ -282,8 +330,7 @@ class RedditCrawler:
                 data = await self._fetch_json(url, oauth=False)
             logger.info("[Post] 步骤 1/3: 获取成功")
 
-            # Reddit 返回一个包含两个 Listing 的数组
-            # 第一个是帖子信息，第二个是评论
+            # Reddit 返回两个 listing：第一个是帖子，第二个是评论树。
             if not isinstance(data, list) or len(data) < 2:
                 logger.error("[Post] 响应格式无效")
                 raise ValueError("Invalid Reddit post response format")
@@ -330,16 +377,15 @@ class RedditCrawler:
     async def fetch_subreddit(
         self, name: str, sort: str = "hot", limit: int = 25
     ) -> List[dict]:
-        """
-        抓取版块帖子列表
+        """抓取子版块帖子列表。
 
-        Args:
-            name: 版块名称（不含 r/ 前缀）
-            sort: 排序方式 (hot, new, top, rising)
-            limit: 返回帖子数量限制（最大 100）
+        参数：
+            name: 版块名（不含 ``r/`` 前缀）。
+            sort: 排序方式（``hot/new/top/rising``）。
+            limit: 最大帖子数，范围 ``1..100``。
 
-        Returns:
-            帖子列表
+        返回：
+            List[dict]: 规范化帖子列表。
         """
         name = (name or "").strip()
         if name.lower().startswith("r/"):
@@ -347,7 +393,7 @@ class RedditCrawler:
 
         logger.info(f"[Subreddit] 开始抓取 r/{name} (sort={sort}, limit={limit})")
 
-        # 验证排序方式
+        # 验证排序方式，非法值回退到 hot。
         valid_sorts = ["hot", "new", "top", "rising"]
         if sort not in valid_sorts:
             logger.warning(f"[Subreddit] 无效排序方式 '{sort}'，使用默认 'hot'")
@@ -403,17 +449,17 @@ class RedditCrawler:
             raise
 
     async def close(self):
-        """关闭 HTTP 客户端"""
+        """关闭底层 HTTP 客户端。"""
         if self._client and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
 
     async def __aenter__(self):
-        """支持 async with 语法"""
+        """支持 ``async with`` 语法。"""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """退出时自动关闭客户端"""
+        """离开 ``async with`` 时自动关闭客户端。"""
         await self.close()
 
 

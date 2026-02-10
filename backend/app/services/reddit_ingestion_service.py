@@ -1,4 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+"""Reddit 旧模型入库服务。
+
+该模块将 Reddit 抓取结果写入旧版表结构
+（``subreddits/posts/comments``），用于兼容既有接口。
+"""
 
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -9,19 +14,29 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging_config import get_logger
-from app.models.associations import post_tags
-from app.models.comment import Comment
-from app.models.payload import CommentPayload, PostPayload
-from app.models.post import Post
-from app.models.subreddit import Subreddit
-from app.models.tag import Tag
+from app.models.post_tag_associations import post_tags
+from app.models.comments import Comment
+from app.models.payloads import CommentPayload, PostPayload
+from app.models.posts import Post
+from app.models.subreddits import Subreddit
+from app.models.tags import Tag
 
 logger = get_logger("reddit_trace.ingest")
+
+# 该文件采用“函数级 docstring + 少量关键注释”的风格，避免过度注释。
 
 REDDIT_WEB_BASE_URL = "https://www.reddit.com"
 
 
 def normalize_subreddit_name(name: str) -> str:
+    """标准化 subreddit 名称。
+
+    参数：
+        name: 原始 subreddit 名称（可带 ``r/`` 前缀）。
+
+    返回：
+        str: 标准化后的 subreddit 名称。
+    """
     n = (name or "").strip()
     if n.lower().startswith("r/"):
         n = n[2:]
@@ -29,6 +44,7 @@ def normalize_subreddit_name(name: str) -> str:
 
 
 def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """将时间转换为 UTC 时区感知时间。"""
     if not dt:
         return None
     if dt.tzinfo is None:
@@ -37,6 +53,14 @@ def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def build_reddit_permalink(permalink: Optional[str]) -> Optional[str]:
+    """构建完整 Reddit 永久链接。
+
+    参数：
+        permalink: 相对或绝对 permalink。
+
+    返回：
+        Optional[str]: 可用时返回绝对 URL。
+    """
     if not permalink:
         return None
     if permalink.startswith("http://") or permalink.startswith("https://"):
@@ -47,6 +71,16 @@ def build_reddit_permalink(permalink: Optional[str]) -> Optional[str]:
 
 
 async def upsert_subreddit(db: AsyncSession, *, name: str, fetched_at: datetime) -> Subreddit:
+    """创建或更新旧版 subreddit 记录。
+
+    参数：
+        db: 异步数据库会话。
+        name: subreddit 名称。
+        fetched_at: 最近抓取时间。
+
+    返回：
+        Subreddit: 持久化后的 subreddit 实体。
+    """
     normalized = normalize_subreddit_name(name)
     if not normalized:
         raise ValueError("subreddit_name is required")
@@ -62,6 +96,15 @@ async def upsert_subreddit(db: AsyncSession, *, name: str, fetched_at: datetime)
 
 
 async def _get_or_create_tags(db: AsyncSession, names: Iterable[str]) -> Dict[str, Tag]:
+    """获取已有标签并补齐缺失标签。
+
+    参数：
+        db: 异步数据库会话。
+        names: 候选标签名称。
+
+    返回：
+        Dict[str, Tag]: 标签名到标签实体的映射。
+    """
     normalized = {str(n).strip() for n in names if str(n).strip()}
     if not normalized:
         return {}
@@ -87,6 +130,17 @@ async def save_subreddit_posts(
     posts: List[Dict[str, Any]],
     fetched_at: Optional[datetime] = None,
 ) -> Tuple[Subreddit, int, int]:
+    """批量 Upsert 一个 subreddit 的旧版帖子数据。
+
+    参数：
+        db: 异步数据库会话。
+        subreddit_name: subreddit 名称。
+        posts: Reddit 原始帖子字典列表。
+        fetched_at: 可选抓取时间。
+
+    返回：
+        Tuple[Subreddit, int, int]: ``(subreddit, 新增数量, 更新数量)``。
+    """
     fetched_at = fetched_at or datetime.now(timezone.utc)
     subreddit = await upsert_subreddit(db, name=subreddit_name, fetched_at=fetched_at)
 
@@ -149,7 +203,6 @@ async def save_subreddit_posts(
 
     await db.flush()
 
-    # Upsert payload + flair tags
     payload_map: Dict[str, PostPayload] = {}
     if reddit_ids:
         result = await db.execute(select(PostPayload).where(PostPayload.reddit_id.in_(reddit_ids)))
@@ -209,6 +262,17 @@ async def save_post_comments(
     comments: List[Dict[str, Any]],
     fetched_at: Optional[datetime] = None,
 ) -> Tuple[int, int]:
+    """批量 Upsert 单贴评论到旧版评论表。
+
+    参数：
+        db: 异步数据库会话。
+        post: 父级旧版帖子。
+        comments: Reddit 原始评论字典列表。
+        fetched_at: 可选抓取时间。
+
+    返回：
+        Tuple[int, int]: ``(新增数量, 更新数量)``。
+    """
     fetched_at = fetched_at or datetime.now(timezone.utc)
 
     reddit_ids = [c.get("id") for c in comments if c.get("id")]
@@ -257,7 +321,6 @@ async def save_post_comments(
 
     await db.flush()
 
-    # Fix parent_id mapping (Reddit uses "t1_xxx" / "t3_xxx")
     for comment_data in comments:
         reddit_id = comment_data.get("id")
         if not reddit_id:
@@ -277,7 +340,6 @@ async def save_post_comments(
 
     await db.flush()
 
-    # Upsert payload
     payload_map: Dict[str, CommentPayload] = {}
     if reddit_ids:
         result = await db.execute(

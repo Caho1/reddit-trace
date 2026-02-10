@@ -1,8 +1,8 @@
-# Reddit Trace
+# Trace Hub
 
-基于 **Reddit JSON Hack** 方法论的用户需求挖掘系统。
+基于多平台社区数据的用户需求挖掘系统（当前支持 Reddit + Hacker News）。
 
-通过自动抓取 Reddit 用户真实对话，利用 AI 智能分析提取用户痛点、需求和创业机会。
+通过自动抓取社区真实对话，利用 AI 智能分析提取用户痛点、需求和创业机会。
 
 ## 核心价值
 
@@ -14,10 +14,10 @@
 ## 功能特性
 
 ### 数据采集
-- 单个帖子 URL 抓取
-- 整个版块热门/最新帖子抓取
-- 定时自动监控指定版块
-- 支持代理配置
+- 多平台统一抓取（Reddit / Hacker News）
+- 统一目标管理（source + target_type + target_key）
+- 定时自动监控目标
+- 平台适配器可扩展
 
 ### AI 分析
 - 多模型支持（OpenAI / Claude / Ollama）
@@ -78,6 +78,8 @@ cp .env.example .env
 ```env
 # 数据库
 DATABASE_URL=postgresql://user:password@localhost:5432/reddit_trace
+# 是否在应用启动时自动 create_all（建议生产环境关闭）
+AUTO_CREATE_TABLES=false
 
 # 代理（访问 Reddit 需要）
 HTTP_PROXY=http://127.0.0.1:7890
@@ -93,16 +95,39 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 createdb reddit_trace
 ```
 
-6. **启动服务**
+6. **执行数据库迁移（推荐）**
+```bash
+cd backend
+uv run alembic upgrade head
+```
+
+7. **启动服务**
 ```bash
 uvicorn app.main:app --reload
 ```
 
 访问 http://localhost:8000/docs 查看 API 文档。
 
+### 迁移常用命令
+
+```bash
+# 生成新迁移
+cd backend
+uv run alembic revision -m "your_migration_name"
+
+# 查看当前版本
+uv run alembic current
+
+# 升级到最新
+uv run alembic upgrade head
+
+# 回滚一步
+uv run alembic downgrade -1
+```
+
 ## API 示例
 
-### 抓取单个帖子
+### 抓取单个帖子（兼容接口）
 ```bash
 curl -X POST http://localhost:8000/api/crawler/fetch-post \
   -H "Content-Type: application/json" \
@@ -121,6 +146,18 @@ curl -X POST http://localhost:8000/api/crawler/fetch-subreddit \
 curl -X POST http://localhost:8000/api/subreddits \
   -H "Content-Type: application/json" \
   -d '{"name": "SaaS", "monitor_enabled": true, "fetch_interval": 60}'
+```
+
+### 统一目标抓取（推荐）
+```bash
+curl -X POST http://localhost:8000/api/sources/fetch \
+  -H "Content-Type: application/json" \
+  -d '{"source": "hackernews", "target_type": "feed", "target_key": "topstories", "limit": 30}'
+```
+
+### 查询统一内容（推荐）
+```bash
+curl "http://localhost:8000/api/posts?source=hackernews&limit=20"
 ```
 
 ## 项目结构
@@ -143,7 +180,15 @@ reddit-trace/
 └── README.md
 ```
 
-## Reddit JSON Hack 方法论
+## 多平台架构要点
+
+- `source_targets`: 统一监控目标
+- `source_items/source_comments`: 统一内容与评论实体
+- `SourceAdapter`: 平台适配器抽象
+- `source_registry`: 适配器注册中心
+- `sources/* API`: 统一平台能力入口
+
+## Reddit JSON Hack 方法论（保留）
 
 **核心逻辑**: 在任意 Reddit 帖子 URL 后加 `/.json`，即可获取完整的 JSON 数据。
 

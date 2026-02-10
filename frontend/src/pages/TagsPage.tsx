@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { getErrorMessage } from '../lib/errors'
-import { createTag, deleteTag, listTags, type Tag } from '../services/redditTraceApi'
+import { createTag, deleteTag, listTags, type Tag } from '../services/traceHubApi'
 
 export function TagsPage() {
   const queryClient = useQueryClient()

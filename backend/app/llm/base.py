@@ -1,4 +1,4 @@
-"""LLM 抽象基类定义"""
+﻿"""LLM 抽象基类定义"""
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
@@ -12,10 +12,10 @@ class BaseLLM(ABC):
         """
         分析评论内容
 
-        Args:
+        参数：
             content: 评论文本内容
 
-        Returns:
+        返回：
             dict: 分析结果，包含情感、主题、关键词等信息
         """
         pass
@@ -25,10 +25,10 @@ class BaseLLM(ABC):
         """
         批量筛选评论
 
-        Args:
+        参数：
             comments: 评论文本列表
 
-        Returns:
+        返回：
             List[bool]: 每条评论是否通过筛选
         """
         pass
@@ -38,10 +38,10 @@ class BaseLLM(ABC):
         """
         翻译文本到中文
 
-        Args:
+        参数：
             text: 待翻译的文本
 
-        Returns:
+        返回：
             str: 翻译后的中文文本
         """
         pass
